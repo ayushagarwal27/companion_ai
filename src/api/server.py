@@ -10,10 +10,12 @@ app = FastAPI(title="Companion AI")
 @app.post('/chat')
 async def companion(userLLMQueryRequest:UserLLMQueryRequest, graph = Depends(get_graph)):
     session_id = userLLMQueryRequest.session_id or str(uuid.uuid4())
-    config = {"configurable":{"thread_id":session_id}}
+    configurable = {"thread_id": session_id}
+    if userLLMQueryRequest.user_id:
+        configurable["user_id"] = userLLMQueryRequest.user_id
     message = HumanMessage(userLLMQueryRequest.query)
-    response = graph.invoke({"messages":[message]}, config=config)
-    return {"session_id":session_id, "response":response["messages"][-1].content}
+    response = graph.invoke({"messages":[message]}, config=configurable)
+    return {"session_id":session_id,"user_id": userLLMQueryRequest.user_id, "response":response["messages"][-1].content}
 
 
 if __name__ == "__main__":

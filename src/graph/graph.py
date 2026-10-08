@@ -1,6 +1,7 @@
 from langgraph.graph import StateGraph, MessagesState, START, END
 from src.agents.country_agent import country_agent_node
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.store.memory import InMemoryStore
 
 def graph_builder():
     graph = StateGraph(MessagesState)
@@ -8,7 +9,8 @@ def graph_builder():
     graph.add_edge(START, 'country_agent_node')
     graph.add_edge('country_agent_node', END)
     checkpointer = InMemorySaver()
-    compiled_graph = graph.compile(checkpointer=checkpointer)
+    store = InMemoryStore()
+    compiled_graph = graph.compile(checkpointer=checkpointer, store=store)
     return compiled_graph
 
 
