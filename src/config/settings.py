@@ -12,4 +12,8 @@ class Settings(BaseSettings):
     openai_api_key:str= Field(...)
     chat_model:str =  Field(default="gpt-4o-mini")
 
+    # Database
+    database_url:str = Field(..., description="postgresql database url")
+    redis_url:str = Field(..., description="redis database url")
+
 settings = Settings()

@@ -1,7 +1,7 @@
-from src.graph.graph import companion_graph
+from src.graph.graph import get_compiled_graph
 
 def get_graph():
     """
-    Returns the compiled Companion LangGraph graph.
+    Yields the compiled Companion LangGraph graph for FastAPI dependency injection.
     """
-    return companion_graph
+    yield from get_compiled_graph()
