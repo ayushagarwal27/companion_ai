@@ -5,6 +5,8 @@ from src.config.settings import settings
 from langchain.messages import HumanMessage
 from langgraph.checkpoint.redis import RedisSaver
 from langgraph.store.postgres import PostgresStore
+from langchain_openai import OpenAIEmbeddings
+from pydantic import SecretStr
 from contextlib import asynccontextmanager
 import uvicorn
 import uuid
@@ -12,8 +14,12 @@ import uuid
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Running database setup...")
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-small", api_key=SecretStr(settings.openai_api_key))
     with RedisSaver.from_conn_string(settings.redis_url) as checkpointer, \
-         PostgresStore.from_conn_string(settings.database_url) as store:
+         PostgresStore.from_conn_string(
+             settings.database_url,
+             index={"embed": embeddings, "dims": 1536}
+         ) as store:
         checkpointer.setup()
         store.setup()
     print("Database setup complete!")

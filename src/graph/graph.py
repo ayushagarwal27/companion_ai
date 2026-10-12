@@ -2,6 +2,7 @@ from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.checkpoint.redis import RedisSaver
 from langgraph.store.postgres import PostgresStore
 from langchain_openai import OpenAIEmbeddings
+from pydantic import SecretStr
 from src.agents.country_agent import country_agent_node
 from src.config.settings import settings
 
@@ -12,7 +13,7 @@ graph.add_edge('country_agent_node', END)
 
 def get_compiled_graph():
     # Initialize embeddings for the semantic search
-    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-small", api_key=SecretStr(settings.openai_api_key))
     
     # Open connections
     with RedisSaver.from_conn_string(settings.redis_url) as checkpointer, \
