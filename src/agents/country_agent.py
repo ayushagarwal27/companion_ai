@@ -3,12 +3,11 @@ import uuid
 from langchain.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
-from langgraph.graph import MessagesState
 from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
-
+from src.state.country_state import CompanionState
 from src.config.settings import settings
-from src.prompts.country_agent import SYSTEM_PROMPT
+from src.prompts.country_agent import build_system_prompt
 
 llm = ChatOpenAI(model=settings.chat_model, api_key=settings.openai_api_key)  # type: ignore
 
@@ -19,11 +18,11 @@ class MemoryExtraction(BaseModel):
     updated_procedural_rules: str | None = Field(default=None, description="Updated behavioral rules for this user, if anything changed")
 
 
-def country_agent_node(state: MessagesState, config: RunnableConfig, *, store: BaseStore):
+def country_agent_node(state: CompanionState, config: RunnableConfig, *, store: BaseStore):
     user_id = config["configurable"].get("user_id") # type: ignore
     query = state["messages"][-1].content
 
-    system_prompt = SYSTEM_PROMPT
+    system_prompt = build_system_prompt(state["country"])
     if user_id:
         semantic = store.search(("memories", user_id, "semantic"))
         episodic = store.search(("memories", user_id, "episodic"), query=query)

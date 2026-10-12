@@ -30,7 +30,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Companion AI", lifespan=lifespan)
 
 
-
 @app.post('/chat')
 async def companion(userLLMQueryRequest:UserLLMQueryRequest, graph = Depends(get_graph)):
     session_id = userLLMQueryRequest.session_id or str(uuid.uuid4())
@@ -39,7 +38,11 @@ async def companion(userLLMQueryRequest:UserLLMQueryRequest, graph = Depends(get
         configurable["user_id"] = userLLMQueryRequest.user_id
     message = HumanMessage(userLLMQueryRequest.query)
 
-    response = graph.invoke({"messages":[message]}, config={"configurable": configurable})
+    graph_input = {"messages": [message]}
+    if userLLMQueryRequest.country:
+        graph_input["country"] = userLLMQueryRequest.country
+
+    response = graph.invoke(graph_input, config={"configurable": configurable})
     return {"session_id":session_id,"user_id": userLLMQueryRequest.user_id, "response":response["messages"][-1].content}
 
 

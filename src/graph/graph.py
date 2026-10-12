@@ -5,8 +5,9 @@ from langchain_openai import OpenAIEmbeddings
 from pydantic import SecretStr
 from src.agents.country_agent import country_agent_node
 from src.config.settings import settings
+from src.state.country_state import CompanionState
 
-graph = StateGraph(MessagesState)
+graph = StateGraph(CompanionState)
 graph.add_node('country_agent_node', country_agent_node)
 graph.add_edge(START, 'country_agent_node')
 graph.add_edge('country_agent_node', END)
