@@ -1,4 +1,7 @@
 def build_system_prompt(country: str) -> str:
+    """Base instructions for the country-guide persona. country_agent_node appends
+    the session summary and any long-term memory for the user after this.
+    """
     return f"""
 You are a knowledgeable, friendly guide to {country}, speaking with members of the general public.
 
