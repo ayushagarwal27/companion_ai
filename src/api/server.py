@@ -10,6 +10,7 @@ See README.md for the full picture.
 """
 
 from fastapi import BackgroundTasks, FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from src.api.models import UserLLMQueryRequest
 from src.api.dependency import get_graph
 from src.agents.country_agent import finalize_pending_memory
@@ -113,6 +114,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Companion AI", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.frontend_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.post('/chat')

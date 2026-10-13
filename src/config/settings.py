@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     history_keep_last_n: int = Field(default=6, description="Number of most recent messages to keep verbatim in the checkpointer when summarizing")
     memory_extraction_every_n_turns: int = Field(default=4, description="Run long-term memory extraction every N conversational turns, independent of summarization")
     session_idle_seconds: int = Field(default=600, description="Treat a session as idle (and flush pending memory) after this many seconds without a /chat call")
+    frontend_origins: list[str] = Field(default=["http://localhost:3000"], description="Origins allowed to call the API via CORS (the Next.js dev server by default)")
 
     # Database
     database_url:str = Field(..., description="postgresql database url")
