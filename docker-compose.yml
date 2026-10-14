@@ -1,0 +1,67 @@
+services:
+  companion-backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: companion-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@companion-postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://companion-redis:6379/0
+    depends_on:
+      - companion-postgres
+      - companion-redis
+    networks:
+      - n8n_default
+      - companion_internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.companionapi.rule=Host(`${BACKEND_DOMAIN}`)"
+      - "traefik.http.routers.companionapi.entrypoints=web,websecure"
+      - "traefik.http.routers.companionapi.tls=true"
+      - "traefik.http.routers.companionapi.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.companionapi.loadbalancer.server.port=8000"
+      - "traefik.http.routers.companionapi.middlewares=companionapi-headers@docker"
+      - "traefik.http.middlewares.companionapi-headers.headers.SSLRedirect=true"
+      - "traefik.http.middlewares.companionapi-headers.headers.SSLHost=${BACKEND_DOMAIN}"
+      - "traefik.http.middlewares.companionapi-headers.headers.STSSeconds=315360000"
+      - "traefik.http.middlewares.companionapi-headers.headers.STSIncludeSubdomains=true"
+      - "traefik.http.middlewares.companionapi-headers.headers.STSPreload=true"
+      - "traefik.http.middlewares.companionapi-headers.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.companionapi-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.companionapi-headers.headers.browserXSSFilter=true"
+
+  companion-postgres:
+    image: postgres:16-alpine
+    container_name: companion-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - companion_pgdata:/var/lib/postgresql/data
+    networks:
+      - companion_internal
+
+  companion-redis:
+    image: redis:7-alpine
+    container_name: companion-redis
+    restart: unless-stopped
+    command: ["redis-server", "--notify-keyspace-events", "Ex"]
+    volumes:
+      - companion_redisdata:/data
+    networks:
+      - companion_internal
+
+networks:
+  n8n_default:
+    external: true
+  companion_internal:
+    driver: bridge
+
+volumes:
+  companion_pgdata:
+  companion_redisdata:
