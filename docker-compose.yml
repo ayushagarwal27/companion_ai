@@ -52,7 +52,7 @@ services:
     image: redis/redis-stack-server:latest
     container_name: companion-redis
     restart: unless-stopped
-    command: ["--notify-keyspace-events", "Ex"]
+    command: ["redis-stack-server", "--notify-keyspace-events", "Ex"]
     volumes:
       - companion_redisdata:/data
     networks:
