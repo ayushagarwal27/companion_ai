@@ -47,10 +47,12 @@ services:
       - companion_internal
 
   companion-redis:
-    image: redis:7-alpine
+    # langgraph-checkpoint-redis uses redisvl, which needs RediSearch
+    # (FT.* commands) - plain redis:7 doesn't have that module.
+    image: redis/redis-stack-server:latest
     container_name: companion-redis
     restart: unless-stopped
-    command: ["redis-server", "--notify-keyspace-events", "Ex"]
+    command: ["--notify-keyspace-events", "Ex"]
     volumes:
       - companion_redisdata:/data
     networks:
