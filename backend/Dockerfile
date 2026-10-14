@@ -4,6 +4,11 @@ FROM python:3.12-slim AS base
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
+# psycopg (pulled in by langgraph-checkpoint-postgres) loads libpq at runtime
+# via ctypes; python:3.12-slim doesn't ship it.
+RUN apt-get update && apt-get install -y --no-install-recommends libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 ENV UV_COMPILE_BYTECODE=1 \
