@@ -14,6 +14,7 @@ services:
       - companion_internal
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=n8n_default"
       - "traefik.http.routers.companionapi.rule=Host(`${BACKEND_DOMAIN}`)"
       - "traefik.http.routers.companionapi.entrypoints=web,websecure"
       - "traefik.http.routers.companionapi.tls=true"
