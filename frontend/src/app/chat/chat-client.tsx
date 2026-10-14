@@ -2,17 +2,28 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, Lightbulb, Send, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { endChatSession, sendChatMessage } from "@/lib/api";
+import { COUNTRY_FLAGS } from "@/lib/countries";
 import { getOrCreateUserId } from "@/lib/user";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  time: number;
+}
+
+const QUICK_IDEAS = [
+  "What's the food like there?",
+  "Tell me a fun fact!",
+  "What's the culture like?",
+  "Any famous landmarks?",
+];
+
+function formatTime(ts: number) {
+  return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
 export function ChatClient() {
@@ -20,6 +31,7 @@ export function ChatClient() {
   const searchParams = useSearchParams();
   const country = searchParams.get("country") ?? "";
   const visit = searchParams.get("v") ?? "";
+  const flag = COUNTRY_FLAGS[country] ?? "🌍";
 
   const [userId, setUserId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -29,6 +41,7 @@ export function ChatClient() {
   const [ending, setEnding] = useState(false);
   const [ended, setEnded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!country) {
@@ -51,15 +64,17 @@ export function ChatClient() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, sending]);
 
   const MIN_QUERY_LENGTH = 10;
+  const trimmedLength = input.trim().length;
+  const isTooShort = trimmedLength > 0 && trimmedLength < MIN_QUERY_LENGTH;
 
   async function handleSend() {
     const query = input.trim();
     if (query.length < MIN_QUERY_LENGTH || sending || !userId || ended) return;
 
-    setMessages((prev) => [...prev, { role: "user", content: query }]);
+    setMessages((prev) => [...prev, { role: "user", content: query, time: Date.now() }]);
     setInput("");
     setSending(true);
 
@@ -71,19 +86,29 @@ export function ChatClient() {
         country,
       });
       setSessionId(res.session_id);
-      setMessages((prev) => [...prev, { role: "assistant", content: res.response }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: res.response, time: Date.now() },
+      ]);
     } catch (err) {
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           content: "Sorry, something went wrong reaching the server. Please try again.",
+          time: Date.now(),
         },
       ]);
       console.error(err);
     } finally {
       setSending(false);
     }
+  }
+
+  function fillQuickIdea(text: string) {
+    if (sending || ended) return;
+    setInput(text);
+    inputRef.current?.focus();
   }
 
   async function handleEndChat() {
@@ -105,87 +130,176 @@ export function ChatClient() {
   if (!country) return null;
 
   return (
-    <main className="mx-auto flex h-dvh w-full max-w-2xl flex-col p-4">
-      <header className="flex items-center justify-between pb-3">
-        <div>
-          <h1 className="text-lg font-semibold">Learning about {country}</h1>
-          <p className="text-sm text-muted-foreground">
-            Ask anything — history, food, culture, nature, and more.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleEndChat} disabled={ending || ended}>
-            {ended ? "Chat ended" : ending ? "Ending…" : "End chat"}
-          </Button>
-          {ended && (
-            <Button size="sm" onClick={() => router.push("/")}>
-              Start new chat
-            </Button>
-          )}
-        </div>
-      </header>
-      <Separator />
-
-      <ScrollArea className="my-3 min-h-0 flex-1 rounded-lg border p-4">
-        <div className="flex flex-col gap-3">
-          {messages.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Say hello, or ask your first question about {country}!
-            </p>
-          )}
-          {messages.map((m, i) => (
-            <div
-              key={i}
-              className={cn(
-                "max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap",
-                m.role === "user"
-                  ? "self-end bg-primary text-primary-foreground"
-                  : "self-start bg-muted"
-              )}
-            >
-              {m.content}
+    <div className="mx-auto flex h-dvh w-full max-w-3xl flex-col px-3 py-3 sm:px-6 sm:py-4">
+      <header className="flex items-center justify-between gap-3 rounded-xl border-2 border-ink bg-white px-4 py-3 shadow-[3px_3px_0px_var(--ink)]">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push("/")}
+            aria-label="Back to destinations"
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg border-2 border-ink bg-white shadow-[2px_2px_0px_var(--ink)] transition-all hover:bg-muted active:translate-x-px active:translate-y-px active:shadow-none"
+          >
+            <ArrowLeft className="size-4" />
+          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{flag}</span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="font-heading text-lg font-extrabold leading-tight text-ink">
+                  {country}
+                </h1>
+                {!ended && (
+                  <span className="hidden items-center gap-1 rounded-full border-2 border-ink bg-mint-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink sm:inline-flex">
+                    <span className="size-1.5 animate-pulse rounded-full bg-mint" />
+                    Live
+                  </span>
+                )}
+              </div>
+              <p className="text-xs font-medium text-muted-foreground">
+                Ask anything — history, food, culture, nature & more.
+              </p>
             </div>
-          ))}
+          </div>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleEndChat} disabled={ending || ended}>
+          {ended ? "Chat ended" : ending ? "Ending…" : "End chat"}
+        </Button>
+      </header>
+
+      <div className="my-3 min-h-0 flex-1 overflow-y-auto rounded-xl border-2 border-ink bg-surface-low p-3 sm:p-4">
+        <div className="flex flex-col gap-4">
+          {messages.length === 0 && (
+            <div className="flex items-center gap-2 rounded-xl rounded-bl-sm border-2 border-ink bg-white px-4 py-3 shadow-[3px_3px_0px_var(--ink)]">
+              <span className="text-lg">{flag}</span>
+              <p className="text-sm font-medium text-ink">
+                Say hello, or ask your first question about {country}!
+              </p>
+            </div>
+          )}
+          {messages.map((m, i) => {
+            const isUser = m.role === "user";
+            return (
+              <div
+                key={i}
+                className={cn("flex w-full items-end gap-2", isUser ? "justify-end" : "justify-start")}
+              >
+                {!isUser && (
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-ink bg-white text-sm shadow-[1px_1px_0px_var(--ink)]">
+                    {flag}
+                  </span>
+                )}
+                <div
+                  className={cn(
+                    "flex max-w-[78%] flex-col gap-1",
+                    isUser ? "items-end" : "items-start"
+                  )}
+                >
+                  <span className="px-1 text-[11px] font-bold text-muted-foreground">
+                    {isUser ? "You" : country} · {formatTime(m.time)}
+                  </span>
+                  <div
+                    className={cn(
+                      "whitespace-pre-wrap rounded-2xl border-2 border-ink px-4 py-2.5 text-sm font-medium",
+                      isUser
+                        ? "rounded-br-sm bg-cyan-soft text-ink shadow-[2px_2px_0px_var(--ink)]"
+                        : "rounded-bl-sm bg-white text-ink shadow-[3px_3px_0px_var(--ink)]"
+                    )}
+                  >
+                    {m.content}
+                  </div>
+                </div>
+                {isUser && (
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-ink bg-sunshine text-ink shadow-[1px_1px_0px_var(--ink)]">
+                    <User className="size-3.5" />
+                  </span>
+                )}
+              </div>
+            );
+          })}
           {sending && (
-            <div className="self-start rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
-              Thinking…
+            <div className="flex w-full items-end justify-start gap-2">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-ink bg-white text-sm shadow-[1px_1px_0px_var(--ink)]">
+                {flag}
+              </span>
+              <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm border-2 border-ink bg-white px-4 py-3 shadow-[3px_3px_0px_var(--ink)]">
+                <span className="size-1.5 animate-bounce rounded-full bg-ink [animation-delay:-0.3s]" />
+                <span className="size-1.5 animate-bounce rounded-full bg-ink [animation-delay:-0.15s]" />
+                <span className="size-1.5 animate-bounce rounded-full bg-ink" />
+              </div>
             </div>
           )}
           <div ref={bottomRef} />
         </div>
-      </ScrollArea>
+      </div>
 
       <form
-        className="flex flex-col gap-1"
+        className="flex flex-col gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           handleSend();
         }}
       >
-        <div className="flex gap-2">
-          <Input
+        {!ended && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+            <span className="flex shrink-0 items-center gap-1 pr-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              <Lightbulb className="size-3.5" />
+              Ideas:
+            </span>
+            {QUICK_IDEAS.map((idea) => (
+              <button
+                key={idea}
+                type="button"
+                onClick={() => fillQuickIdea(idea)}
+                className="shrink-0 whitespace-nowrap rounded-full border-2 border-ink bg-white px-3 py-1 text-xs font-bold text-ink shadow-[1px_1px_0px_var(--ink)] transition-all hover:bg-sunshine active:translate-x-px active:translate-y-px active:shadow-none"
+              >
+                {idea}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 rounded-xl border-2 border-ink bg-white p-1.5 shadow-[3px_3px_0px_var(--ink)] focus-within:shadow-[4px_4px_0px_var(--ink)]">
+          <input
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={ended ? "This chat has ended" : "Ask a question..."}
             disabled={sending || !userId || ended}
             autoFocus
+            className="flex-1 bg-transparent px-2.5 py-1.5 text-sm font-medium text-ink outline-none placeholder:text-outline disabled:opacity-50"
           />
-          <Button
+          {!ended && (
+            <span
+              className={cn(
+                "hidden shrink-0 rounded-full border-2 border-ink px-2 py-0.5 text-[11px] font-bold shadow-[1px_1px_0px_var(--ink)] sm:inline-block",
+                trimmedLength >= MIN_QUERY_LENGTH ? "bg-mint-soft text-ink" : "bg-bubblegum-soft text-ink"
+              )}
+            >
+              {trimmedLength >= MIN_QUERY_LENGTH
+                ? `${trimmedLength} chars`
+                : `${trimmedLength} / ${MIN_QUERY_LENGTH} min`}
+            </span>
+          )}
+          <button
             type="submit"
+            aria-label="Send message"
             disabled={sending || input.trim().length < MIN_QUERY_LENGTH || !userId || ended}
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg border-2 border-ink bg-sunshine text-ink shadow-[2px_2px_0px_var(--ink)] transition-all hover:bg-sunshine-dim active:translate-x-px active:translate-y-px active:shadow-none disabled:pointer-events-none disabled:opacity-50"
           >
-            Send
-          </Button>
+            <Send className="size-4" />
+          </button>
         </div>
-        {!ended && input.trim().length > 0 && input.trim().length < MIN_QUERY_LENGTH && (
-          <p className="text-xs text-muted-foreground">
-            Keep going — questions need at least {MIN_QUERY_LENGTH} characters.
-          </p>
+        {!ended && isTooShort && (
+          <div className="flex items-start gap-2 rounded-lg border-2 border-ink bg-bubblegum-soft px-3 py-2 shadow-[1px_1px_0px_var(--ink)]">
+            <span className="text-sm leading-none">⚠️</span>
+            <p className="text-xs font-bold text-ink">
+              Keep going — questions need at least {MIN_QUERY_LENGTH} characters.
+            </p>
+          </div>
         )}
         {ended && (
-          <p className="text-xs text-muted-foreground">This chat has ended.</p>
+          <p className="px-1 text-xs font-medium text-muted-foreground">This chat has ended.</p>
         )}
       </form>
-    </main>
+    </div>
   );
 }

@@ -10,3 +10,5 @@ wheels/
 .venv
 .env
 package-lock.json
+designs
+.DS_Store
