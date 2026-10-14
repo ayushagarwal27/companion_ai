@@ -7,15 +7,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@companion-postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://companion-redis:6379/0
-    depends_on:
-      - companion-postgres
-      - companion-redis
     networks:
       - n8n_default
-      - companion_internal
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.companionapi.rule=Host(`${BACKEND_DOMAIN}`)"
@@ -33,39 +26,6 @@ services:
       - "traefik.http.middlewares.companionapi-headers.headers.contentTypeNosniff=true"
       - "traefik.http.middlewares.companionapi-headers.headers.browserXSSFilter=true"
 
-  companion-postgres:
-    # langgraph's PostgresStore CREATE EXTENSION vector for embeddings -
-    # plain postgres doesn't ship pgvector.
-    image: pgvector/pgvector:pg16
-    container_name: companion-postgres
-    restart: unless-stopped
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-    volumes:
-      - companion_pgdata:/var/lib/postgresql/data
-    networks:
-      - companion_internal
-
-  companion-redis:
-    # langgraph-checkpoint-redis uses redisvl, which needs RediSearch
-    # (FT.* commands) - plain redis:7 doesn't have that module.
-    image: redis/redis-stack-server:latest
-    container_name: companion-redis
-    restart: unless-stopped
-    command: ["redis-stack-server", "--notify-keyspace-events", "Ex"]
-    volumes:
-      - companion_redisdata:/data
-    networks:
-      - companion_internal
-
 networks:
   n8n_default:
     external: true
-  companion_internal:
-    driver: bridge
-
-volumes:
-  companion_pgdata:
-  companion_redisdata:
