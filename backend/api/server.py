@@ -11,11 +11,11 @@ See README.md for the full picture.
 
 from fastapi import BackgroundTasks, FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from src.api.models import UserLLMQueryRequest
-from src.api.dependency import get_graph
-from src.agents.country_agent import finalize_pending_memory
-from src.graph.graph import get_compiled_graph
-from src.config.settings import settings
+from backend.api.models import UserLLMQueryRequest
+from backend.api.dependency import get_graph
+from backend.agents.country_agent import finalize_pending_memory
+from backend.graph.graph import get_compiled_graph
+from backend.config.settings import settings
 from langchain.messages import HumanMessage
 from langgraph.checkpoint.redis import RedisSaver
 from langgraph.store.postgres import PostgresStore
@@ -167,4 +167,4 @@ async def end_session(session_id: str, user_id: str, background_tasks: Backgroun
 
 
 if __name__ == "__main__":
-    uvicorn.run("src.api.server:app", host='127.0.0.1', reload=True, port=8001)
+    uvicorn.run("backend.api.server:app", host='127.0.0.1', reload=True, port=8001)

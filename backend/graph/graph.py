@@ -10,9 +10,9 @@ from langgraph.checkpoint.redis import RedisSaver
 from langgraph.store.postgres import PostgresStore
 from langchain_openai import OpenAIEmbeddings
 from pydantic import SecretStr
-from src.agents.country_agent import country_agent_node, maybe_extract_memory_node, summarize_conversation_node
-from src.config.settings import settings
-from src.state.country_state import CompanionState
+from backend.agents.country_agent import country_agent_node, maybe_extract_memory_node, summarize_conversation_node
+from backend.config.settings import settings
+from backend.state.country_state import CompanionState
 
 graph = StateGraph(CompanionState)
 graph.add_node('country_agent_node', country_agent_node)
@@ -28,7 +28,7 @@ def get_compiled_graph():
 
     A generator so it can be driven two ways: as a FastAPI dependency (opens fresh
     connections per request, torn down via the `with` block when the generator is
-    closed after the request) via src.api.dependency.get_graph, or manually driven
+    closed after the request) via backend.api.dependency.get_graph, or manually driven
     once at startup for a long-lived background instance (see server.py's lifespan,
     which uses this for the idle-session listener).
     """

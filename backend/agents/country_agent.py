@@ -16,9 +16,9 @@ from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from langgraph.store.base import BaseStore
 from pydantic import BaseModel, Field
-from src.state.country_state import CompanionState
-from src.config.settings import settings
-from src.prompts.country_agent import build_system_prompt
+from backend.state.country_state import CompanionState
+from backend.config.settings import settings
+from backend.prompts.country_agent import build_system_prompt
 
 llm = ChatOpenAI(model=settings.chat_model, api_key=settings.openai_api_key)  # type: ignore
 

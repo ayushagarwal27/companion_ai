@@ -1,4 +1,4 @@
-from src.graph.graph import get_compiled_graph
+from backend.graph.graph import get_compiled_graph
 
 def get_graph():
     """FastAPI dependency: yields a compiled graph with its own Redis/Postgres connections,

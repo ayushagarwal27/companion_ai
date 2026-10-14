@@ -5,8 +5,8 @@ persistent long-term memory per user across sessions.
 
 ## Stack
 
-- **FastAPI** — HTTP API (`src/api/server.py`)
-- **LangGraph** — conversation graph / orchestration (`src/graph`, `src/agents`)
+- **FastAPI** — HTTP API (`backend/api/server.py`)
+- **LangGraph** — conversation graph / orchestration (`backend/graph`, `backend/agents`)
 - **Redis** — short-term memory: per-session checkpointed conversation state
 - **PostgreSQL** (+ OpenAI embeddings) — long-term memory: durable, cross-session facts about each user
 - **OpenAI** — chat model and structured-output extraction
@@ -114,7 +114,7 @@ warning is logged, and the periodic/explicit-end triggers still cover memory.
 
 ## Configuration
 
-All settings load from `.env` (see `src/config/settings.py`):
+All settings load from `.env` (see `backend/config/settings.py`):
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
@@ -130,7 +130,7 @@ All settings load from `.env` (see `src/config/settings.py`):
 ## Running locally
 
 ```bash
-uv run python -m src.api.server
+uv run python -m backend.api.server
 ```
 
 Requires a reachable Redis and Postgres (connection strings in `.env`). Runs
