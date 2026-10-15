@@ -15,7 +15,7 @@ const body = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Companion AI",
+  title: "WorldWiseAI",
   description: "A friendly AI guide for learning about the world's countries",
 };
 

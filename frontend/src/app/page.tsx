@@ -42,7 +42,7 @@ export default function Home() {
               🧭
             </span>
             <span className="font-heading text-lg font-extrabold tracking-tight text-ink">
-              Companion AI
+              WorldWiseAI
             </span>
           </div>
           <span className="hidden items-center rounded-full border-2 border-ink bg-mint-soft px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-ink sm:inline-flex">
