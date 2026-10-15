@@ -312,7 +312,7 @@ export function ChatClient() {
             placeholder={ended ? "This chat has ended" : "Ask a question..."}
             disabled={sending || !userId || ended}
             autoFocus
-            className="flex-1 bg-transparent px-2.5 py-1.5 text-sm font-medium text-ink outline-none placeholder:text-outline disabled:opacity-50"
+            className="flex-1 bg-transparent px-2.5 py-1.5 text-base font-medium text-ink outline-none placeholder:text-outline disabled:opacity-50 md:text-sm"
           />
           <button
             type="submit"
