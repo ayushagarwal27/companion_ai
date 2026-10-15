@@ -11,6 +11,7 @@ See README.md for the full picture.
 
 from fastapi import BackgroundTasks, FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from backend.api.models import UserLLMQueryRequest
 from backend.api.dependency import get_graph
 from backend.agents.country_agent import finalize_pending_memory
@@ -26,6 +27,7 @@ import redis.asyncio as redis
 import uvicorn
 import uuid
 import asyncio
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -124,9 +126,26 @@ app.add_middleware(
 )
 
 
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+# Sentinel placed on the token queue (by run_graph's `finally`) to signal that
+# graph.invoke has returned (successfully or not) and no more tokens are coming.
+_STREAM_DONE = object()
+
+
 @app.post('/chat')
 async def companion(userLLMQueryRequest:UserLLMQueryRequest, background_tasks: BackgroundTasks, graph = Depends(get_graph)):
-    """Run one conversation turn and refresh this session's idle-detection marker."""
+    """Run one conversation turn and stream the reply back over SSE, refreshing
+    this session's idle-detection marker once the turn completes.
+
+    graph.invoke (and everything it does - the LLM call, Redis/Postgres access)
+    stays synchronous and runs in a worker thread; country_agent_node forwards
+    each generated chunk through `token_callback`, which hands it to this
+    coroutine via an asyncio.Queue so it can be yielded to the client as it's
+    produced instead of only after the full reply is ready.
+    """
     session_id = userLLMQueryRequest.session_id or str(uuid.uuid4())
     configurable = {"thread_id": session_id}
     if userLLMQueryRequest.user_id:
@@ -138,15 +157,46 @@ async def companion(userLLMQueryRequest:UserLLMQueryRequest, background_tasks: B
     if userLLMQueryRequest.country:
         graph_input["country"] = userLLMQueryRequest.country
 
-    response = graph.invoke(graph_input, config={"configurable": configurable})
+    async def event_stream():
+        loop = asyncio.get_running_loop()
+        token_queue: asyncio.Queue = asyncio.Queue()
 
-    if userLLMQueryRequest.user_id:
-        async with app.state.redis.pipeline() as pipe:
-            pipe.set(f"{SESSION_ALIVE_PREFIX}{session_id}", "1", ex=settings.session_idle_seconds)
-            pipe.set(f"{SESSION_USER_PREFIX}{session_id}", userLLMQueryRequest.user_id, ex=settings.session_idle_seconds + 60)
-            await pipe.execute()
+        def on_token(token: str) -> None:
+            loop.call_soon_threadsafe(token_queue.put_nowait, token)
 
-    return {"session_id":session_id,"user_id": userLLMQueryRequest.user_id, "response":response["messages"][-1].content}
+        def run_graph():
+            try:
+                configurable["token_callback"] = on_token
+                return graph.invoke(graph_input, config={"configurable": configurable})
+            finally:
+                loop.call_soon_threadsafe(token_queue.put_nowait, _STREAM_DONE)
+
+        yield _sse("session", {"session_id": session_id, "user_id": userLLMQueryRequest.user_id})
+
+        graph_future = asyncio.ensure_future(asyncio.to_thread(run_graph))
+
+        while True:
+            item = await token_queue.get()
+            if item is _STREAM_DONE:
+                break
+            yield _sse("token", {"content": item})
+
+        try:
+            await graph_future
+        except Exception:
+            logger.exception("Error while streaming chat response for session %s", session_id)
+            yield _sse("error", {"message": "Something went wrong reaching the server."})
+            return
+
+        if userLLMQueryRequest.user_id:
+            async with app.state.redis.pipeline() as pipe:
+                pipe.set(f"{SESSION_ALIVE_PREFIX}{session_id}", "1", ex=settings.session_idle_seconds)
+                pipe.set(f"{SESSION_USER_PREFIX}{session_id}", userLLMQueryRequest.user_id, ex=settings.session_idle_seconds + 60)
+                await pipe.execute()
+
+        yield _sse("done", {})
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.post('/chat/{session_id}/end')

@@ -104,7 +104,7 @@ a returning user still knows what they said weeks ago.
 | --- | --- |
 | Language | Python 3.12 |
 | Agent Framework | LangGraph + LangChain |
-| LLM / Embeddings | OpenAI (`gpt-4o-mini` + `text-embedding-3-small`) |
+| LLM / Embeddings | OpenAI (`gpt-6-luna` + `text-embedding-3-small`) |
 | API | FastAPI + Uvicorn |
 | Frontend | Next.js 16 (React 19, TypeScript) + Tailwind CSS v4 |
 | Short-term store | Redis Stack (via `langgraph-checkpoint-redis`, uses RediSearch) |
@@ -321,13 +321,13 @@ BACKEND_DOMAIN=
 FRONTEND_ORIGINS=["https://your-app.vercel.app"]
 
 # --- Optional (defaults shown in backend/config/settings.py) ---
-CHAT_MODEL=gpt-4o-mini
+CHAT_MODEL=gpt-6-luna
 ```
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `openai_api_key` | — | required |
-| `chat_model` | `gpt-4o-mini` | model for responses and extraction |
+| `chat_model` | `gpt-6-luna` | model for responses and extraction |
 | `database_url` | — | Postgres connection string (long-term store) |
 | `redis_url` | — | Redis connection string (checkpointer + session markers) |
 | `history_summarize_trigger` | `10` | message count that triggers summarization |

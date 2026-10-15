@@ -112,6 +112,14 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
+  body {
+    /* Safety net: a flex child that can't shrink below its content width (a
+       long label, an unconstrained text block) should get clipped here
+       rather than widening the whole page and pushing content off-screen
+       on narrow viewports. */
+    overflow-x: hidden;
+  }
   body {
     @apply bg-background text-foreground;
   }

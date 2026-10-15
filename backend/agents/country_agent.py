@@ -10,7 +10,7 @@ the session gets long). See README.md for the full memory architecture.
 import uuid
 from typing import Sequence
 
-from langchain.messages import HumanMessage, RemoveMessage, SystemMessage
+from langchain.messages import AIMessage, HumanMessage, RemoveMessage, SystemMessage
 from langchain_core.messages import BaseMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
@@ -39,6 +39,10 @@ def country_agent_node(state: CompanionState, config: RunnableConfig, *, store: 
     and long-term memory for this user_id (semantic facts, episodic summaries
     relevant to the current query, and procedural behavioral rules). Does not
     write anything to long-term memory itself — see maybe_extract_memory_node.
+
+    If config["configurable"]["token_callback"] is set (see server.py's /chat
+    endpoint), streams the reply through it one chunk at a time instead of
+    waiting for the full completion.
     """
     user_id = config["configurable"].get("user_id") # type: ignore
     query = state["messages"][-1].content
@@ -63,7 +67,19 @@ def country_agent_node(state: CompanionState, config: RunnableConfig, *, store: 
         if procedural:
             system_prompt += f"\n\nBehavioral preferences for this user:\n{procedural.value.get('rules', '')}"
 
-    response = llm.invoke([SystemMessage(system_prompt), *state["messages"]])
+    messages = [SystemMessage(system_prompt), *state["messages"]]
+
+    token_callback = config["configurable"].get("token_callback") # type: ignore
+    if token_callback is not None:
+        response = None
+        for chunk in llm.stream(messages):
+            if chunk.content:
+                token_callback(chunk.content)
+            response = chunk if response is None else response + chunk
+        if response is None:
+            response = AIMessage(content="")
+    else:
+        response = llm.invoke(messages)
 
     return {"messages": [response]}
 

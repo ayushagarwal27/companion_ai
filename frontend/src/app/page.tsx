@@ -20,7 +20,9 @@ export default function Home() {
   }, [query]);
 
   function startChat(country: string) {
-    router.push(`/chat?country=${encodeURIComponent(country)}&v=${crypto.randomUUID()}`);
+    router.push(
+      `/chat?country=${encodeURIComponent(country)}&v=${crypto.randomUUID()}`,
+    );
   }
 
   function handleCustomSubmit(e: React.FormEvent) {
@@ -62,8 +64,8 @@ export default function Home() {
             </span>
           </h1>
           <p className="max-w-2xl text-base font-medium text-muted-foreground sm:text-lg">
-            Pick any country and jump into an open-ended chat with your AI guide —
-            culture, food, history, nature, or whatever curiosity strikes.
+            Pick any country and jump into an open-ended chat with your AI guide
+            : culture, food, history, nature, or whatever curiosity strikes.
           </p>
         </section>
 
@@ -97,8 +99,12 @@ export default function Home() {
                 onClick={() => startChat(country)}
                 className="group flex flex-col items-center gap-2 rounded-xl border-2 border-ink bg-white p-4 text-center shadow-[3px_3px_0px_var(--ink)] transition-all hover:-translate-x-0.5 hover:-translate-y-0.5 hover:bg-sunshine hover:shadow-[5px_5px_0px_var(--ink)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_var(--ink)]"
               >
-                <span className="text-3xl">{COUNTRY_FLAGS[country] ?? "🌍"}</span>
-                <span className="font-heading text-sm font-bold text-ink">{country}</span>
+                <span className="text-3xl">
+                  {COUNTRY_FLAGS[country] ?? "🌍"}
+                </span>
+                <span className="font-heading text-sm font-bold text-ink">
+                  {country}
+                </span>
                 <span className="flex items-center gap-1 text-xs font-bold text-ink/60 opacity-0 transition-opacity group-hover:opacity-100">
                   Explore <ArrowRight className="size-3" />
                 </span>
@@ -108,9 +114,12 @@ export default function Home() {
         ) : (
           <section className="flex flex-col items-center gap-2 rounded-xl border-2 border-ink bg-white p-10 text-center shadow-[4px_4px_0px_var(--ink)]">
             <span className="text-3xl">🗺️</span>
-            <p className="font-heading text-lg font-bold text-ink">No match in the quick list</p>
+            <p className="font-heading text-lg font-bold text-ink">
+              No match in the quick list
+            </p>
             <p className="max-w-md text-sm font-medium text-muted-foreground">
-              No worries — type it below and your companion will take you there anyway.
+              No worries — type it below and your companion will take you there
+              anyway.
             </p>
           </section>
         )}
@@ -125,8 +134,8 @@ export default function Home() {
                 Can&apos;t find your destination?
               </h2>
               <p className="text-sm font-medium text-ink/80">
-                Type any country, island, ancient empire, or fantasy kingdom — Madagascar,
-                Atlantis, you name it.
+                Type any country, island, ancient empire, or fantasy kingdom —
+                Madagascar, Atlantis, you name it.
               </p>
             </div>
             <form
@@ -140,7 +149,10 @@ export default function Home() {
                 className="flex-1 bg-white"
                 required
               />
-              <Button type="submit" disabled={launching || !customDestination.trim()}>
+              <Button
+                type="submit"
+                disabled={launching || !customDestination.trim()}
+              >
                 {launching ? "Launching…" : "Go"}
                 <Rocket className="size-4" />
               </Button>
@@ -152,7 +164,8 @@ export default function Home() {
       <footer className="w-full border-t-2 border-ink bg-white">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 py-4 text-xs font-bold text-muted-foreground sm:flex-row sm:px-6">
           <span className="flex items-center gap-1.5">
-            <Compass className="size-3.5" /> No login required — stored locally in your browser
+            <Compass className="size-3.5" /> No login required — stored locally
+            in your browser
           </span>
           <span>No quizzes. No grading. Just curiosity.</span>
         </div>

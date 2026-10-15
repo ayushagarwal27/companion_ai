@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Lightbulb, Send, User } from "lucide-react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
-import { endChatSession, sendChatMessage } from "@/lib/api";
+import { endChatSession, streamChatMessage } from "@/lib/api";
 import { COUNTRY_FLAGS } from "@/lib/countries";
 import { getOrCreateUserId } from "@/lib/user";
 import { cn } from "@/lib/utils";
@@ -25,6 +27,25 @@ const QUICK_IDEAS = [
 function formatTime(ts: number) {
   return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
+
+/** Keeps the assistant's markdown reply visually consistent with the rest of the
+ * (compact, hand-styled) chat UI instead of browser-default element spacing. */
+const markdownComponents: Components = {
+  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+  strong: ({ children }) => <strong className="font-extrabold">{children}</strong>,
+  ul: ({ children }) => <ul className="mb-2 list-disc space-y-1 pl-4 last:mb-0">{children}</ul>,
+  ol: ({ children }) => <ol className="mb-2 list-decimal space-y-1 pl-4 last:mb-0">{children}</ol>,
+  li: ({ children }) => <li>{children}</li>,
+  a: ({ children, href }) => (
+    <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+      {children}
+    </a>
+  ),
+  code: ({ children }) => <code className="rounded bg-surface-low px-1 py-0.5 text-xs">{children}</code>,
+  blockquote: ({ children }) => (
+    <blockquote className="border-l-2 border-ink/40 pl-2 italic">{children}</blockquote>
+  ),
+};
 
 export function ChatClient() {
   const router = useRouter();
@@ -69,6 +90,10 @@ export function ChatClient() {
   const MIN_QUERY_LENGTH = 10;
   const trimmedLength = input.trim().length;
   const isTooShort = trimmedLength > 0 && trimmedLength < MIN_QUERY_LENGTH;
+  const lastMessage = messages[messages.length - 1];
+  // True while waiting on the first chunk of a reply - once streaming starts,
+  // the growing assistant bubble (role "assistant") replaces these dots.
+  const awaitingResponse = sending && lastMessage?.role === "user";
 
   async function handleSend() {
     const query = input.trim();
@@ -78,18 +103,34 @@ export function ChatClient() {
     setInput("");
     setSending(true);
 
+    // Accumulated outside the setState updater: React 18 Strict Mode invokes
+    // updater functions twice to catch impurities, so mutating state here
+    // (rather than inside the updater) keeps each setMessages call pure -
+    // both invocations read the same already-computed values.
+    let assistantContent = "";
+    let assistantStarted = false;
+
     try {
-      const res = await sendChatMessage({
-        query,
-        sessionId: sessionId ?? undefined,
-        userId,
-        country,
-      });
-      setSessionId(res.session_id);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: res.response, time: Date.now() },
-      ]);
+      await streamChatMessage(
+        { query, sessionId: sessionId ?? undefined, userId, country },
+        {
+          onSession: (res) => setSessionId(res.session_id),
+          onToken: (token) => {
+            const isFirstToken = !assistantStarted;
+            assistantStarted = true;
+            assistantContent += token;
+
+            setMessages((prev) => {
+              if (isFirstToken) {
+                return [...prev, { role: "assistant", content: assistantContent, time: Date.now() }];
+              }
+              const next = [...prev];
+              next[next.length - 1] = { ...next[next.length - 1], content: assistantContent };
+              return next;
+            });
+          },
+        }
+      );
     } catch (err) {
       setMessages((prev) => [
         ...prev,
@@ -131,8 +172,8 @@ export function ChatClient() {
 
   return (
     <div className="mx-auto flex h-dvh w-full max-w-3xl flex-col px-3 py-3 sm:px-6 sm:py-4">
-      <header className="flex items-center justify-between gap-3 rounded-xl border-2 border-ink bg-white px-4 py-3 shadow-[3px_3px_0px_var(--ink)]">
-        <div className="flex items-center gap-3">
+      <header className="flex items-center justify-between gap-2 rounded-xl border-2 border-ink bg-white px-3 py-3 shadow-[3px_3px_0px_var(--ink)] sm:gap-3 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <button
             onClick={() => router.push("/")}
             aria-label="Back to destinations"
@@ -140,21 +181,21 @@ export function ChatClient() {
           >
             <ArrowLeft className="size-4" />
           </button>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">{flag}</span>
-            <div>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 text-2xl">{flag}</span>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="font-heading text-lg font-extrabold leading-tight text-ink">
+                <h1 className="truncate font-heading text-lg font-extrabold leading-tight text-ink">
                   {country}
                 </h1>
                 {!ended && (
-                  <span className="hidden items-center gap-1 rounded-full border-2 border-ink bg-mint-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink sm:inline-flex">
+                  <span className="hidden shrink-0 items-center gap-1 rounded-full border-2 border-ink bg-mint-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink sm:inline-flex">
                     <span className="size-1.5 animate-pulse rounded-full bg-mint" />
                     Live
                   </span>
                 )}
               </div>
-              <p className="text-xs font-medium text-muted-foreground">
+              <p className="hidden truncate text-xs font-medium text-muted-foreground sm:block">
                 Ask anything — history, food, culture, nature & more.
               </p>
             </div>
@@ -198,13 +239,19 @@ export function ChatClient() {
                   </span>
                   <div
                     className={cn(
-                      "whitespace-pre-wrap rounded-2xl border-2 border-ink px-4 py-2.5 text-sm font-medium",
+                      "rounded-2xl border-2 border-ink px-4 py-2.5 text-sm font-medium",
                       isUser
-                        ? "rounded-br-sm bg-cyan-soft text-ink shadow-[2px_2px_0px_var(--ink)]"
+                        ? "whitespace-pre-wrap rounded-br-sm bg-cyan-soft text-ink shadow-[2px_2px_0px_var(--ink)]"
                         : "rounded-bl-sm bg-white text-ink shadow-[3px_3px_0px_var(--ink)]"
                     )}
                   >
-                    {m.content}
+                    {isUser ? (
+                      m.content
+                    ) : (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                        {m.content}
+                      </ReactMarkdown>
+                    )}
                   </div>
                 </div>
                 {isUser && (
@@ -215,7 +262,7 @@ export function ChatClient() {
               </div>
             );
           })}
-          {sending && (
+          {awaitingResponse && (
             <div className="flex w-full items-end justify-start gap-2">
               <span className="flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-ink bg-white text-sm shadow-[1px_1px_0px_var(--ink)]">
                 {flag}
@@ -267,18 +314,6 @@ export function ChatClient() {
             autoFocus
             className="flex-1 bg-transparent px-2.5 py-1.5 text-sm font-medium text-ink outline-none placeholder:text-outline disabled:opacity-50"
           />
-          {!ended && (
-            <span
-              className={cn(
-                "hidden shrink-0 rounded-full border-2 border-ink px-2 py-0.5 text-[11px] font-bold shadow-[1px_1px_0px_var(--ink)] sm:inline-block",
-                trimmedLength >= MIN_QUERY_LENGTH ? "bg-mint-soft text-ink" : "bg-bubblegum-soft text-ink"
-              )}
-            >
-              {trimmedLength >= MIN_QUERY_LENGTH
-                ? `${trimmedLength} chars`
-                : `${trimmedLength} / ${MIN_QUERY_LENGTH} min`}
-            </span>
-          )}
           <button
             type="submit"
             aria-label="Send message"
