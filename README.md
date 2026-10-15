@@ -1,11 +1,12 @@
-# Companion AI
+# WorldWiseAI
 
-> A LangGraph-based conversational agent that acts as a country-focused travel
-> guide, with persistent long-term memory per user across sessions — backed by
-> a Redis checkpointer for live conversation state and a Postgres/pgvector
-> store for durable, cross-session facts.
+> A LangGraph-based conversational agent that acts as a friendly, knowledgeable
+> guide for learning about the world's countries, with persistent long-term
+> memory per user across sessions — backed by a Redis checkpointer for live
+> conversation state and a Postgres/pgvector store for durable, cross-session
+> facts.
 
-![Companion AI landing page](images/landing.png)
+![WorldWiseAI landing page](images/landing.png)
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-green.svg)](https://fastapi.tiangolo.com)
@@ -33,16 +34,18 @@
 
 ## Project Description
 
-Companion AI is a chat agent that plays country-specific travel guide, remembering
-who you are across every future conversation instead of forgetting you the moment
-the session ends.
+WorldWiseAI is a chat agent that plays friendly, knowledgeable assistant for
+learning about a specific country — its history, culture, geography, and
+customs — remembering who you are across every future conversation instead of
+forgetting you the moment the session ends.
 
 **The problem it solves:** a chatbot that forgets you between sessions has to
-relearn your preferences, trip constraints, and past questions every single time
-— which makes long-running, personal use cases (a recurring travel companion,
-a long-term planning assistant) feel shallow. Companion AI separates *short-term*
-conversation state from *long-term* per-user memory, so a brand-new session for
-a returning user still knows what they said weeks ago.
+relearn your interests, knowledge level, and past questions every single time
+— which makes long-running, personal use cases (an ongoing study companion,
+a curious learner coming back to the same country over weeks) feel shallow.
+WorldWiseAI separates *short-term* conversation state from *long-term*
+per-user memory, so a brand-new session for a returning user still knows what
+they said weeks ago.
 
 **What makes it different:**
 
@@ -64,7 +67,7 @@ a returning user still knows what they said weeks ago.
 
 ## Features
 
-### Country-Focused Conversational Guide
+### Country-Focused Learning Assistant
 
 - One LangGraph agent per conversation, scoped to a `country` set at session start
 - Persona + a rolling conversation `summary` + long-term memory for the
@@ -367,10 +370,10 @@ page to start a chat session against the backend.
 ## Frontend
 
 A Next.js console in front of the `/chat` API: pick a country (or type a
-custom destination) on the landing page, then converse with the country-guide
+custom one) on the landing page, then converse with the country-learning
 agent on the chat page.
 
-![Companion AI chat](images/chat.png)
+![WorldWiseAI chat](images/chat.png)
 
 | Page | Route | Talks to |
 | --- | --- | --- |
