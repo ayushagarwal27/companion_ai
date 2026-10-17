@@ -13,6 +13,8 @@ class Settings(BaseSettings):
 
     openai_api_key:str= Field(...)
     chat_model:str =  Field(default="gpt-6-luna")
+    deepgram_api_key: str | None = Field(default=None, description="Deepgram API key for voice-mode speech-to-text; voice mode is disabled if unset")
+    cartesia_api_key: str | None = Field(default=None, description="Cartesia API key for voice-mode text-to-speech; voice mode is disabled if unset")
     history_summarize_trigger: int = Field(default=10, description="Summarize + archive older messages once the session's message count exceeds this")
     history_keep_last_n: int = Field(default=6, description="Number of most recent messages to keep verbatim in the checkpointer when summarizing")
     memory_extraction_every_n_turns: int = Field(default=4, description="Run long-term memory extraction every N conversational turns, independent of summarization")

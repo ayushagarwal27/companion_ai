@@ -9,7 +9,7 @@ Three mechanisms keep long-term memory (Postgres) in sync with ongoing sessions
 See README.md for the full picture.
 """
 
-from fastapi import BackgroundTasks, FastAPI, Depends
+from fastapi import BackgroundTasks, FastAPI, Depends, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from backend.api.models import UserLLMQueryRequest
@@ -17,10 +17,12 @@ from backend.api.dependency import get_graph
 from backend.agents.country_agent import finalize_pending_memory
 from backend.graph.graph import get_compiled_graph
 from backend.config.settings import settings
+from backend.voice.session import handle_voice_connection
 from langchain.messages import HumanMessage
 from langgraph.checkpoint.redis import RedisSaver
 from langgraph.store.postgres import PostgresStore
 from langchain_openai import OpenAIEmbeddings
+from pipecat.workers.runner import WorkerRunner
 from pydantic import SecretStr
 from contextlib import asynccontextmanager
 import redis.asyncio as redis
@@ -104,6 +106,13 @@ async def lifespan(app: FastAPI):
     app.state.bg_graph = next(bg_graph_gen)
     app.state.idle_listener_task = asyncio.create_task(_listen_for_idle_sessions(app))
 
+    # One long-lived WorkerRunner for the app's whole life, shared by every voice
+    # session (see backend/voice/session.py): auto_end=False keeps it running with
+    # zero workers between calls, and handle_sigint/handle_sigterm are off since
+    # uvicorn already owns process signal handling.
+    app.state.voice_runner = WorkerRunner(handle_sigint=False, handle_sigterm=False)
+    app.state.voice_runner_task = asyncio.create_task(app.state.voice_runner.run(auto_end=False))
+
     yield
 
     app.state.idle_listener_task.cancel()
@@ -111,6 +120,8 @@ async def lifespan(app: FastAPI):
         await app.state.idle_listener_task
     except asyncio.CancelledError:
         pass
+    await app.state.voice_runner.cancel()
+    await app.state.voice_runner_task
     bg_graph_gen.close()
     await app.state.redis.aclose()
 
@@ -214,6 +225,14 @@ async def end_session(session_id: str, user_id: str, background_tasks: Backgroun
     await app.state.redis.delete(f"{SESSION_ALIVE_PREFIX}{session_id}", f"{SESSION_USER_PREFIX}{session_id}")
 
     return {"session_id": session_id, "pending_memory_extracted": pending}
+
+
+@app.websocket('/voice')
+async def voice(websocket: WebSocket):
+    """Voice-mode counterpart to /chat - see backend/voice/session.py for the
+    handshake, Pipecat pipeline, and disconnect-time memory flush.
+    """
+    await handle_voice_connection(app, websocket)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(uv add *)",
+      "Bash(curl -s https://pypi.org/pypi/pipecat-ai/json)",
+      "Bash(python3 -c ' *)"
+    ]
+  }
+}

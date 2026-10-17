@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Lightbulb, Send, User } from "lucide-react";
+import { ArrowLeft, Lightbulb, Mic, Send, Square, User } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { endChatSession, streamChatMessage } from "@/lib/api";
 import { COUNTRY_FLAGS } from "@/lib/countries";
 import { getOrCreateUserId } from "@/lib/user";
 import { cn } from "@/lib/utils";
+import { startVoiceSession, type VoiceSession, type VoiceState } from "@/lib/voice";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -61,8 +62,15 @@ export function ChatClient() {
   const [sending, setSending] = useState(false);
   const [ending, setEnding] = useState(false);
   const [ended, setEnded] = useState(false);
+  const [voiceState, setVoiceState] = useState<VoiceState | "idle">("idle");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const voiceSessionRef = useRef<VoiceSession | null>(null);
+  // Accumulates the current spoken turn's assistant text across onAssistantToken
+  // calls, which - unlike handleSend's local closure - fire from callbacks spread
+  // out over time, so the accumulator has to live outside any single function call.
+  const voiceAssistantContentRef = useRef("");
+  const voiceAssistantStartedRef = useRef(false);
 
   useEffect(() => {
     if (!country) {
@@ -80,7 +88,13 @@ export function ChatClient() {
     setSessionId(null);
     setInput("");
     setEnded(false);
+    setVoiceState("idle");
     setUserId(getOrCreateUserId());
+
+    return () => {
+      voiceSessionRef.current?.stop();
+      voiceSessionRef.current = null;
+    };
   }, [country, visit, router]);
 
   useEffect(() => {
@@ -146,6 +160,56 @@ export function ChatClient() {
     }
   }
 
+  const voiceActive = voiceState !== "idle" && voiceState !== "disconnected";
+
+  async function handleStartVoice() {
+    if (voiceActive || sending || !userId || ended) return;
+
+    setVoiceState("connecting");
+    try {
+      voiceSessionRef.current = await startVoiceSession(
+        { sessionId: sessionId ?? undefined, userId, country },
+        {
+          onSession: (res) => setSessionId(res.session_id),
+          onStateChange: (state) => setVoiceState(state),
+          onUserText: (text) => {
+            voiceAssistantContentRef.current = "";
+            voiceAssistantStartedRef.current = false;
+            setMessages((prev) => [...prev, { role: "user", content: text, time: Date.now() }]);
+          },
+          onAssistantToken: (token) => {
+            const isFirstToken = !voiceAssistantStartedRef.current;
+            voiceAssistantStartedRef.current = true;
+            voiceAssistantContentRef.current += token;
+
+            setMessages((prev) => {
+              if (isFirstToken) {
+                return [...prev, { role: "assistant", content: voiceAssistantContentRef.current, time: Date.now() }];
+              }
+              const next = [...prev];
+              next[next.length - 1] = { ...next[next.length - 1], content: voiceAssistantContentRef.current };
+              return next;
+            });
+          },
+          onError: (message) => {
+            console.error(message);
+            setVoiceState("idle");
+          },
+        }
+      );
+    } catch (err) {
+      console.error(err);
+      setVoiceState("idle");
+    }
+  }
+
+  async function handleStopVoice() {
+    const session = voiceSessionRef.current;
+    voiceSessionRef.current = null;
+    setVoiceState("idle");
+    await session?.stop();
+  }
+
   function fillQuickIdea(text: string) {
     if (sending || ended) return;
     setInput(text);
@@ -157,6 +221,13 @@ export function ChatClient() {
 
     setEnding(true);
     try {
+      // Close the voice connection first so its own disconnect-driven memory
+      // flush (backend/voice/session.py) finishes before the explicit /end
+      // call below runs against the same session - both converge on the same
+      // finalize_pending_memory, so ordering just avoids a redundant race.
+      if (voiceActive) {
+        await handleStopVoice();
+      }
       if (sessionId && userId) {
         await endChatSession(sessionId, userId);
       }
@@ -191,7 +262,13 @@ export function ChatClient() {
                 {!ended && (
                   <span className="hidden shrink-0 items-center gap-1 rounded-full border-2 border-ink bg-mint-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink sm:inline-flex">
                     <span className="size-1.5 animate-pulse rounded-full bg-mint" />
-                    Live
+                    {voiceState === "connecting"
+                      ? "Connecting…"
+                      : voiceState === "listening"
+                        ? "Listening…"
+                        : voiceState === "speaking"
+                          ? "Speaking…"
+                          : "Live"}
                   </span>
                 )}
               </div>
@@ -305,19 +382,31 @@ export function ChatClient() {
         )}
 
         <div className="flex items-center gap-2 rounded-xl border-2 border-ink bg-white p-1.5 shadow-[3px_3px_0px_var(--ink)] focus-within:shadow-[4px_4px_0px_var(--ink)]">
+          <button
+            type="button"
+            aria-label={voiceActive ? "End voice call" : "Start voice call"}
+            onClick={voiceActive ? handleStopVoice : handleStartVoice}
+            disabled={sending || !userId || ended}
+            className={cn(
+              "flex size-9 shrink-0 items-center justify-center rounded-lg border-2 border-ink shadow-[2px_2px_0px_var(--ink)] transition-all active:translate-x-px active:translate-y-px active:shadow-none disabled:pointer-events-none disabled:opacity-50",
+              voiceActive ? "bg-bubblegum-soft hover:bg-bubblegum-soft/80" : "bg-white hover:bg-muted"
+            )}
+          >
+            {voiceActive ? <Square className="size-3.5" /> : <Mic className="size-4" />}
+          </button>
           <input
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={ended ? "This chat has ended" : "Ask a question..."}
-            disabled={sending || !userId || ended}
+            placeholder={ended ? "This chat has ended" : voiceActive ? "Voice call in progress…" : "Ask a question..."}
+            disabled={sending || !userId || ended || voiceActive}
             autoFocus
             className="flex-1 bg-transparent px-2.5 py-1.5 text-base font-medium text-ink outline-none placeholder:text-outline disabled:opacity-50 md:text-sm"
           />
           <button
             type="submit"
             aria-label="Send message"
-            disabled={sending || input.trim().length < MIN_QUERY_LENGTH || !userId || ended}
+            disabled={sending || input.trim().length < MIN_QUERY_LENGTH || !userId || ended || voiceActive}
             className="flex size-9 shrink-0 items-center justify-center rounded-lg border-2 border-ink bg-sunshine text-ink shadow-[2px_2px_0px_var(--ink)] transition-all hover:bg-sunshine-dim active:translate-x-px active:translate-y-px active:shadow-none disabled:pointer-events-none disabled:opacity-50"
           >
             <Send className="size-4" />
